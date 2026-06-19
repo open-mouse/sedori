@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="せどりスキャナー">
+<title>せどりスキャナー</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f5;color:#1a1a1a;min-height:100vh}
+  #app{max-width:600px;margin:0 auto;padding:16px}
+  .hdr{display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #e0e0e0}
+  .hdr-icon{font-size:24px}
+  .hdr h1{font-size:18px;font-weight:600;color:#1a1a1a;flex:1}
+  .badge{background:#dbeafe;color:#1d4ed8;font-size:12px;font-weight:600;padding:3px 10px;border-radius:12px}
+  .card{background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:14px 16px;margin-bottom:12px}
+  .card-title{font-size:14px;font-weight:600;color:#1a1a1a;display:flex;align-items:center;gap:6px;margin-bottom:10px}
+  .settings-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+  .field label{display:block;font-size:12px;color:#6b7280;margin-bottom:4px}
+  .field input{width:100%;font-size:15px;padding:8px 10px;border-radius:8px;border:1px solid #d1d5db;background:#fff;color:#1a1a1a;-webkit-appearance:none}
+  .field input:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,0.15)}
+  #video-container{position:relative;width:100%;height:220px;background:#000;border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center;margin-bottom:12px}
+  #video{width:100%;height:100%;object-fit:cover;display:block}
+  .scan-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+  .scan-frame{width:220px;height:80px;border:2px solid rgba(59,130,246,0.9);border-radius:6px}
+  .scan-line{position:absolute;left:10%;right:10%;height:2px;background:#3b82f6;top:50%;animation:scanline 2s ease-in-out infinite}
+  @keyframes scanline{0%,100%{top:30%}50%{top:70%}}
+  #placeholder{color:#999;font-size:13px;position:absolute;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;padding:0 20px}
+  #placeholder .ph-icon{font-size:40px}
+  .scan-controls{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  #start-btn{display:flex;align-items:center;gap:6px;font-size:15px;font-weight:600;padding:10px 20px;border-radius:10px;background:#3b82f6;color:#fff;border:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  #start-btn:active{background:#1d4ed8;transform:scale(0.97)}
+  #start-btn.active{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
+  .status-text{font-size:13px;color:#6b7280;flex:1}
+  .manual-row{display:flex;gap:8px}
+  .manual-row input{flex:1;font-size:15px;padding:9px 12px;border-radius:8px;border:1px solid #d1d5db;background:#fff;color:#1a1a1a;-webkit-appearance:none}
+  .manual-row input:focus{outline:none;border-color:#3b82f6}
+  .manual-row button{font-size:22px;padding:0 14px;border-radius:8px;border:1px solid #d1d5db;background:#fff;color:#374151;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .manual-row button:active{background:#f3f4f6}
+  .list-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .list-header span{font-size:14px;font-weight:600;color:#1a1a1a}
+  .list-actions{display:flex;gap:6px}
+  .act-btn{font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid #d1d5db;background:#fff;cursor:pointer;color:#6b7280;display:flex;align-items:center;gap:4px;-webkit-tap-highlight-color:transparent}
+  .act-btn:active{background:#f3f4f6}
+  .act-btn.filter-on{background:#dcfce7;color:#166534;border-color:#86efac}
+  #item-list{display:flex;flex-direction:column;gap:10px}
+  .item-card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px}
+  .item-card.hit{border:2px solid #22c55e;background:#f0fdf4}
+  .item-card.miss{opacity:0.55}
+  .item-top{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .bc-icon{width:38px;height:38px;background:#f3f4f6;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+  .item-info{flex:1;min-width:0}
+  .item-code{font-size:15px;font-weight:600;color:#1a1a1a;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .item-meta{font-size:12px;color:#9ca3af;margin-top:2px}
+  .item-del{background:none;border:none;cursor:pointer;color:#9ca3af;font-size:20px;padding:4px;line-height:1;-webkit-tap-highlight-color:transparent}
+  .item-del:active{color:#ef4444}
+  .hit-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:10px;background:#dcfce7;color:#166534;margin-bottom:8px}
+  .sell-input-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+  .sell-input-row label{font-size:13px;color:#6b7280;white-space:nowrap}
+  .sell-input-row input{width:130px;font-size:15px;padding:7px 10px;border-radius:8px;border:1px solid #d1d5db;background:#fff;color:#1a1a1a;-webkit-appearance:none}
+  .sell-input-row input:focus{outline:none;border-color:#3b82f6}
+  .sell-hint{font-size:11px;color:#9ca3af;width:100%}
+  .profit-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+  .metric{background:#f9fafb;border-radius:8px;padding:8px 10px}
+  .metric-label{font-size:11px;color:#9ca3af;margin-bottom:3px}
+  .metric-val{font-size:15px;font-weight:600;color:#1a1a1a}
+  .metric-val.good{color:#16a34a}
+  .metric-val.bad{color:#dc2626}
+  .price-links{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+  .price-link{font-size:13px;font-weight:500;padding:8px 10px;border-radius:8px;text-decoration:none;display:flex;align-items:center;gap:5px;border:1px solid;-webkit-tap-highlight-color:transparent;cursor:pointer}
+  .price-link:active{opacity:0.7}
+  .lnk-amazon{background:#fef3c7;color:#78350f;border-color:#fbbf24}
+  .lnk-rakuten{background:#fee2e2;color:#7f1d1d;border-color:#f87171}
+  .lnk-mercari{background:#ede9fe;color:#3b0764;border-color:#a78bfa}
+  .lnk-yahoo{background:#dcfce7;color:#14532d;border-color:#4ade80}
+  .empty-state{text-align:center;padding:3rem 1rem;color:#9ca3af}
+  .empty-icon{font-size:48px;display:block;margin-bottom:10px}
+  .empty-state p{font-size:14px;line-height:1.6}
+  .csv-section{background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:14px 16px;margin-top:4px}
+  .csv-desc{font-size:13px;color:#6b7280;margin-bottom:12px;line-height:1.6}
+  .csv-btns{display:flex;gap:8px;flex-wrap:wrap}
+  .csv-btn{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600;padding:10px 16px;border-radius:10px;cursor:pointer;border:1px solid;-webkit-tap-highlight-color:transparent}
+  .csv-btn:active{opacity:0.8;transform:scale(0.97)}
+  .csv-btn-primary{background:#3b82f6;color:#fff;border-color:#3b82f6}
+  .csv-btn-secondary{background:#fff;color:#374151;border-color:#d1d5db}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);font-size:14px;padding:10px 22px;border-radius:24px;opacity:0;transition:opacity 0.3s;pointer-events:none;z-index:999;color:#fff;background:#16a34a;white-space:nowrap;max-width:90vw;text-align:center}
+  .toast.show{opacity:1}
+  .toast.dup{background:#6b7280}
+  .toast.warn{background:#dc2626}
+  @media(max-width:400px){
+    .profit-row{grid-template-columns:repeat(3,1fr)}
+    .price-links{grid-template-columns:repeat(2,1fr)}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="hdr">
+    <div class="hdr-icon">📦</div>
+    <h1>せどりスキャナー</h1>
+    <span class="badge" id="count-badge">0件</span>
+  </div>
+
+  <div class="card">
+    <div class="card-title">⚙️ 仕入れ設定</div>
+    <div class="settings-grid">
+      <div class="field">
+        <label>仕入れ値（円）</label>
+        <input type="number" id="g-cost" placeholder="例: 500" min="0" inputmode="numeric" oninput="rerenderAll()">
+      </div>
+      <div class="field">
+        <label>送料・手数料（円）</label>
+        <input type="number" id="g-fee" placeholder="例: 300" min="0" inputmode="numeric" oninput="rerenderAll()">
+      </div>
+      <div class="field">
+        <label>目標利益率（%）</label>
+        <input type="number" id="g-min-rate" placeholder="例: 30" min="0" max="100" value="30" inputmode="numeric" oninput="rerenderAll()">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div id="video-container">
+      <video id="video" autoplay playsinline muted></video>
+      <div class="scan-overlay"><div class="scan-frame"></div></div>
+      <div class="scan-line" id="scan-line" style="display:none"></div>
+      <div id="placeholder">
+        <div class="ph-icon">📷</div>
+        <span>「スキャン開始」を押してください</span>
+      </div>
+    </div>
+    <div class="scan-controls">
+      <button id="start-btn" onclick="toggleScan()">
+        <span id="btn-icon">▶</span> <span id="btn-label">スキャン開始</span>
+      </button>
+      <span class="status-text" id="status-text">カメラ待機中</span>
+    </div>
+    <div class="manual-row">
+      <input type="text" id="manual-input" placeholder="バーコードを手動入力" inputmode="numeric" onkeydown="if(event.key==='Enter')addManual()">
+      <button onclick="addManual()">＋</button>
+    </div>
+  </div>
+
+  <div class="list-header">
+    <span>スキャン済み商品</span>
+    <div class="list-actions">
+      <button class="act-btn" id="filter-btn" onclick="toggleFilter()">🔍 フィルター</button>
+      <button class="act-btn" onclick="clearAll()">🗑 全削除</button>
+    </div>
+  </div>
+
+  <div id="item-list">
+    <div class="empty-state">
+      <span class="empty-icon">📊</span>
+      <p>バーコードをスキャンすると<br>ここに商品が追加されます</p>
+    </div>
+  </div>
+
+  <div class="csv-section">
+    <div class="card-title">📄 CSVエクスポート</div>
+    <div class="csv-desc">スキャンリストをCSVで書き出します。帰宅後にKeepaやスプレッドシートで一括価格調査に活用できます。</div>
+    <div class="csv-btns">
+      <button class="csv-btn csv-btn-primary" onclick="exportCSV(false)">⬇ 全件エクスポート</button>
+      <button class="csv-btn csv-btn-secondary" onclick="exportCSV(true)">✅ 条件クリアのみ</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.4/lib/umd/index.min.js"></script>
+<script>
+let items=[];
+let scanning=false;
+let codeReader=null;
+let controls=null;
+let filterOn=false;
+
+function g(id){return document.getElementById(id)}
+function val(id){return parseFloat(g(id).value)||0}
+
+function showToast(msg,type){
+  const t=g('toast');
+  t.textContent=msg;
+  t.className='toast show'+(type?' '+type:'');
+  clearTimeout(t._t);
+  t._t=setTimeout(()=>t.className='toast',2500);
+}
+
+function updateBadge(){
+  g('count-badge').textContent=items.length+'件';
+}
+
+function calcProfit(item){
+  const cost=val('g-cost');
+  const fee=val('g-fee');
+  const sell=item.sellPrice||0;
+  const total=cost+fee;
+  const profit=sell-total;
+  const rate=sell>0?Math.round((profit/sell)*1000)/10:null;
+  const minRate=val('g-min-rate')||30;
+  const threshold=total*(1+minRate/100);
+  const isHit=sell>0&&sell>=threshold;
+  return{cost,fee,sell,total,profit,rate,isHit,minRate,threshold};
+}
+
+function passesFilter(item){
+  if(!filterOn)return true;
+  return calcProfit(item).isHit;
+}
+
+function detectType(code){
+  if(code.length===13)return'EAN-13';
+  if(code.length===12)return'UPC-A';
+  if(code.length===8)return'EAN-8';
+  return'バーコード';
+}
+
+function renderItem(item,i){
+  const c=calcProfit(item);
+  const q=encodeURIComponent(item.code);
+  const profitClass=c.profit>0?'good':c.profit<0?'bad':'';
+  const rateStr=c.rate!==null?c.rate.toFixed(1)+'%':'—';
+  const profitStr=c.sell>0?(c.profit>=0?'+':'')+Math.round(c.profit).toLocaleString()+'円':'—';
+  const threshStr=c.total>0?'目標売値: '+Math.ceil(c.threshold).toLocaleString()+'円以上':'';
+
+  return`<div class="item-card${c.isHit?' hit':c.sell>0&&!c.isHit?' miss':''}">
+    ${c.isHit?'<div class="hit-badge">✅ 利益'+c.minRate+'%以上 — 仕入れ候補</div>':''}
+    <div class="item-top">
+      <div class="bc-icon">🏷</div>
+      <div class="item-info">
+        <div class="item-code">${item.code}</div>
+        <div class="item-meta">${item.time} · ${item.type}</div>
+      </div>
+      <button class="item-del" onclick="removeItem(${i})">✕</button>
+    </div>
+    <div class="sell-input-row">
+      <label>売値</label>
+      <input type="number" placeholder="売値（円）" value="${item.sellPrice||''}" min="0" inputmode="numeric"
+        oninput="updateSell(${i},this.value)"
+        style="width:130px;font-size:15px;padding:7px 10px;border-radius:8px;border:1px solid #d1d5db;background:#fff;color:#1a1a1a;-webkit-appearance:none">
+      ${threshStr?`<span class="sell-hint">${threshStr}</span>`:''}
+    </div>
+    <div class="profit-row">
+      <div class="metric">
+        <div class="metric-label">利益額</div>
+        <div class="metric-val ${c.sell>0?profitClass:''}">${profitStr}</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">利益率</div>
+        <div class="metric-val ${c.sell>0?profitClass:''}">${rateStr}</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">売値</div>
+        <div class="metric-val">${c.sell>0?c.sell.toLocaleString()+'円':'未入力'}</div>
+      </div>
+    </div>
+    <div class="price-links">
+      <a class="price-link lnk-amazon" href="https://www.amazon.co.jp/s?k=${q}" target="_blank">🛒 Amazon</a>
+      <a class="price-link lnk-rakuten" href="https://search.rakuten.co.jp/search/mall/${q}/" target="_blank">🔴 楽天</a>
+      <a class="price-link lnk-mercari" href="https://jp.mercari.com/search?keyword=${q}" target="_blank">🏷 メルカリ</a>
+      <a class="price-link lnk-yahoo" href="https://shopping.yahoo.co.jp/search?p=${q}" target="_blank">🟢 Yahoo!</a>
+    </div>
+  </div>`;
+}
+
+function rerenderAll(){
+  const el=g('item-list');
+  if(items.length===0){
+    el.innerHTML='<div class="empty-state"><span class="empty-icon">📊</span><p>バーコードをスキャンすると<br>ここに商品が追加されます</p></div>';
+    return;
+  }
+  const html=items.map((item,i)=>passesFilter(item)?renderItem(item,i):'').join('');
+  el.innerHTML=html.trim()||'<div class="empty-state"><span class="empty-icon">🔍</span><p>条件を満たす商品がありません</p></div>';
+  updateBadge();
+}
+
+function updateSell(i,v){
+  items[i].sellPrice=parseFloat(v)||0;
+  rerenderAll();
+}
+
+function addCode(code){
+  code=code.trim();
+  if(!code)return false;
+  if(items.find(it=>it.code===code)){showToast('⚠ 既にリストにあります','dup');return false;}
+  const now=new Date();
+  const time=now.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  items.unshift({code,time,type:detectType(code),sellPrice:0});
+  rerenderAll();
+  showToast('✓ '+code+' を追加');
+  return true;
+}
+
+function removeItem(i){
+  items.splice(i,1);
+  rerenderAll();
+  updateBadge();
+}
+
+function clearAll(){
+  if(items.length===0)return;
+  if(!confirm('スキャン済み商品をすべて削除しますか？'))return;
+  items=[];
+  rerenderAll();
+  updateBadge();
+}
+
+function addManual(){
+  const inp=g('manual-input');
+  if(addCode(inp.value))inp.value='';
+}
+
+function toggleFilter(){
+  filterOn=!filterOn;
+  const btn=g('filter-btn');
+  btn.className='act-btn'+(filterOn?' filter-on':'');
+  btn.textContent=filterOn?'✅ フィルター中':'🔍 フィルター';
+  rerenderAll();
+}
+
+function exportCSV(hitOnly){
+  if(items.length===0){showToast('データがありません','warn');return;}
+  const cost=val('g-cost');
+  const fee=val('g-fee');
+  const minRate=val('g-min-rate')||30;
+  const target=hitOnly?items.filter(it=>calcProfit(it).isHit):items;
+  if(target.length===0){showToast('条件を満たす商品がありません','warn');return;}
+  const rows=[['バーコード','種別','スキャン時刻','仕入れ値','手数料','売値','利益額','利益率(%)','目標売値','判定']];
+  target.forEach(item=>{
+    const c=calcProfit(item);
+    rows.push([
+      item.code,item.type,item.time,
+      cost||'',fee||'',
+      item.sellPrice||'',
+      item.sellPrice?Math.round(c.profit):'',
+      item.sellPrice&&c.rate!==null?c.rate.toFixed(1):'',
+      c.total>0?Math.ceil(c.threshold):'',
+      c.isHit?'◎仕入候補':item.sellPrice?'✕':'未入力'
+    ]);
+  });
+  const bom='\uFEFF';
+  const csv=bom+rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  const now=new Date();
+  const stamp=now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0')+'_'+String(now.getHours()).padStart(2,'0')+String(now.getMinutes()).padStart(2,'0');
+  a.download='sedori_'+stamp+(hitOnly?'_hit':'')+'.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('✓ CSV書き出し完了 ('+target.length+'件)');
+}
+
+async function toggleScan(){
+  if(scanning){stopScan();}else{await startScan();}
+}
+
+async function startScan(){
+  const btn=g('start-btn');
+  const status=g('status-text');
+  const ph=g('placeholder');
+  const sl=g('scan-line');
+  try{
+    g('btn-icon').textContent='⏹';
+    g('btn-label').textContent='停止';
+    btn.className='active';
+    status.textContent='カメラを起動中...';
+    ph.style.display='none';
+    sl.style.display='block';
+    codeReader=new ZXingBrowser.BrowserMultiFormatReader();
+    const devices=await ZXingBrowser.BrowserCodeReader.listVideoInputDevices();
+    const back=devices.find(d=>/back|rear|environment/i.test(d.label))||devices[devices.length-1];
+    let lastCode='',lastTime=0;
+    controls=await codeReader.decodeFromVideoDevice(back?.deviceId,'video',(result)=>{
+      if(result){
+        const code=result.getText();
+        const now=Date.now();
+        if(code!==lastCode||now-lastTime>3000){lastCode=code;lastTime=now;addCode(code);}
+      }
+    });
+    scanning=true;
+    status.textContent='スキャン中 — バーコードをカメラに向けてください';
+  }catch(e){
+    status.textContent='カメラへのアクセスが拒否されました';
+    g('btn-icon').textContent='▶';
+    g('btn-label').textContent='スキャン開始';
+    btn.className='';
+    ph.style.display='flex';
+    sl.style.display='none';
+    showToast('カメラの許可が必要です','warn');
+  }
+}
+
+function stopScan(){
+  if(controls){try{controls.stop();}catch(e){}}controls=null;
+  if(codeReader){try{codeReader.reset();}catch(e){}}codeReader=null;
+  const v=g('video');
+  if(v.srcObject){v.srcObject.getTracks().forEach(t=>t.stop());v.srcObject=null;}
+  scanning=false;
+  g('btn-icon').textContent='▶';
+  g('btn-label').textContent='スキャン開始';
+  g('start-btn').className='';
+  g('status-text').textContent='カメラ待機中';
+  g('placeholder').style.display='flex';
+  g('scan-line').style.display='none';
+}
+
+rerenderAll();
+</script>
+</body>
+</html>
