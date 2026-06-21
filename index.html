@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>せどりバーコードスキャナー（Quagga2版）</title>
+<title>商品検索くん</title>
 <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.2/dist/quagga.min.js"></script>
 <style>
   :root{
@@ -58,35 +58,37 @@
   #lastScan{font-size:13px; color:#555; margin-top:6px; word-break:break-all;}
   #warnBox{display:none; background:#fff3cd; border:1px solid #ffe58f; color:#7a5b00; padding:8px; border-radius:8px; font-size:12px; margin-bottom:8px;}
 
-  #quickLinks{display:none; margin-top:10px; padding:10px; background:#f0f9f4; border:1px solid var(--good-border); border-radius:8px;}
-  #quickLinks .qcode{font-size:13px; font-weight:700; margin-bottom:6px; word-break:break-all;}
-  #quickLinks a{
-    display:inline-block; margin:0 6px 6px 0; padding:8px 14px; border-radius:8px;
-    font-size:13px; font-weight:700; text-decoration:none; color:#fff;
-  }
-
   .settings-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
   .settings-grid label{display:block; font-size:12px; color:#555; margin-bottom:2px;}
   .settings-grid input{width:100%; padding:8px; border:1px solid var(--border); border-radius:6px; font-size:14px;}
 
-  table{width:100%; border-collapse:collapse; font-size:12px;}
-  th,td{border-bottom:1px solid var(--border); padding:6px 4px; text-align:left; white-space:nowrap;}
-  th{background:#f0f2f5; position:sticky; top:0;}
-  .tablewrap{overflow-x:auto;}
-  input.cell{width:70px; padding:4px; border:1px solid var(--border); border-radius:4px; font-size:12px;}
-  input.cell-name{width:140px;}
-  tr.good{background:var(--good);}
-  tr.good td{border-bottom-color:var(--good-border);}
+  .item-card{
+    border:1px solid var(--border); border-radius:10px; padding:10px; margin-bottom:8px;
+    background:#fafbfc;
+  }
+  .item-card.good{background:var(--good); border-color:var(--good-border);}
+  .item-card-head{
+    display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px;
+  }
+  .item-card-head .barcode{font-weight:700; font-size:14px; word-break:break-all;}
+  .item-card-head .time{font-size:10px; color:#888; white-space:nowrap;}
+  input.cell-name{
+    width:100%; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:13px;
+    margin-bottom:6px;
+  }
+  .numbers-row{display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; margin-bottom:6px;}
+  .numbers-row label{display:block; font-size:10px; color:#777; margin-bottom:2px;}
+  .numbers-row input.cell{width:100%; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:13px;}
+  .profit-row{display:flex; gap:14px; font-size:13px; margin-bottom:8px;}
   .profit-pos{color:#16a34a; font-weight:700;}
   .profit-neg{color:var(--danger); font-weight:700;}
-  .links{display:flex; flex-wrap:wrap; gap:3px; max-width:160px;}
-  .links a{display:inline-block; padding:3px 6px; border-radius:5px; font-size:11px; text-decoration:none; color:#fff;}
-  .links-cell{white-space:normal;}
+  .links{display:flex; flex-wrap:wrap; gap:5px; margin-bottom:6px;}
+  .links a{display:inline-block; padding:5px 10px; border-radius:6px; font-size:12px; font-weight:700; text-decoration:none; color:#fff;}
   .l-amazon{background:#ff9900;}
   .l-rakuten{background:#bf0000;}
   .l-mercari{background:#ff5050;}
   .l-yahoo{background:#7300de;}
-  .del-btn{background:var(--danger); color:#fff; border:none; border-radius:5px; padding:4px 8px; font-size:11px;}
+  .del-btn{background:var(--danger); color:#fff; border:none; border-radius:6px; padding:5px 10px; font-size:12px;}
   .footer-actions{
     position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid var(--border);
     padding:8px; display:flex; gap:8px; justify-content:center; flex-wrap:wrap; z-index:10;
@@ -98,26 +100,24 @@
 </head>
 <body>
 
-<h1>📦 せどりバーコードスキャナー</h1>
+<h1>📦 商品検索くん</h1>
 
 <div id="warnBox"></div>
 
 <div class="card">
   <h2>カメラスキャン</h2>
   <div id="scanner-container">
+    <video id="bdVideo" playsinline muted style="display:none;"></video>
     <canvas id="overlay-canvas"></canvas>
     <div id="scanToast"></div>
     <div id="scanProgress"><div id="scanProgress-bar"></div></div>
   </div>
+  <div id="engineLabel" style="font-size:11px;color:#999;margin-top:4px;"></div>
   <div class="scanbar">
     <button id="startBtn" class="btn-primary">スキャン開始</button>
     <button id="stopBtn" class="btn-secondary">停止</button>
   </div>
   <div id="lastScan">最後の読み取り: -</div>
-  <div id="quickLinks">
-    <div class="qcode">直前にスキャンした商品のリンク</div>
-    <div id="quickLinksButtons"></div>
-  </div>
 </div>
 
 <div class="card">
@@ -143,26 +143,8 @@
 
 <div class="card">
   <h2>スキャン済み商品リスト <span class="count-badge" id="countBadge">0</span></h2>
-  <div class="tablewrap">
-    <table id="itemTable">
-      <thead>
-        <tr>
-          <th>バーコード</th>
-          <th>スキャン時刻</th>
-          <th>商品名</th>
-          <th>仕入れ値</th>
-          <th>送料手数料</th>
-          <th>売値</th>
-          <th>利益額</th>
-          <th>利益率</th>
-          <th>検索</th>
-          <th>削除</th>
-        </tr>
-      </thead>
-      <tbody id="itemBody"></tbody>
-    </table>
-    <div class="empty-msg" id="emptyMsg">まだスキャンした商品がありません。「スキャン開始」を押してバーコードをカメラにかざしてください。</div>
-  </div>
+  <div id="itemList"></div>
+  <div class="empty-msg" id="emptyMsg">まだスキャンした商品がありません。「スキャン開始」を押してバーコードをカメラにかざしてください。</div>
 </div>
 
 <div class="footer-actions">
@@ -264,22 +246,110 @@ function setScanProgress(ratio) {
   document.getElementById('scanProgress-bar').style.width = (ratio * 100) + '%';
 }
 
-function showQuickLinks(code, name) {
-  const panel = document.getElementById('quickLinks');
-  const btns = document.getElementById('quickLinksButtons');
-  const q = encodeURIComponent(name || code);
-  btns.innerHTML = `
-    <a class="l-amazon" target="_blank" rel="noopener" href="https://www.amazon.co.jp/s?k=${q}">Amazon</a>
-    <a class="l-rakuten" target="_blank" rel="noopener" href="https://search.rakuten.co.jp/search/mall/${q}/">楽天</a>
-    <a class="l-mercari" target="_blank" rel="noopener" href="https://jp.mercari.com/search?keyword=${q}">メルカリ</a>
-    <a class="l-yahoo" target="_blank" rel="noopener" href="https://shopping.yahoo.co.jp/search?p=${q}">Yahoo</a>
-  `;
-  panel.style.display = 'block';
-}
+// Android Chromeはネイティブの Barcode Detection API を搭載しており、
+// Quagga2(自前の画像処理)よりはるかに高精度・高速に読み取れる。
+// 対応していない場合のみ Quagga2 にフォールバックする。
+const useNativeDetector = 'BarcodeDetector' in window;
+let nativeMediaStream = null;
+let nativeDetector = null;
+let nativeRafId = null;
 
 function startScan() {
   if (scanning) return;
+  scanning = true;
+  document.getElementById('engineLabel').textContent = useNativeDetector
+    ? '高精度モード（ブラウザ内蔵バーコード検出）'
+    : '標準モード（Quagga2）';
 
+  if (useNativeDetector) {
+    startNativeScan();
+  } else {
+    startQuaggaScan();
+  }
+}
+
+function stopScan() {
+  if (!scanning) return;
+  scanning = false;
+  if (useNativeDetector) {
+    stopNativeScan();
+  } else {
+    stopQuaggaScan();
+  }
+  pendingCode = null;
+  pendingCount = 0;
+  setScanProgress(0);
+}
+
+function startNativeScan() {
+  nativeDetector = new BarcodeDetector({
+    formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128']
+  });
+  navigator.mediaDevices.getUserMedia({
+    video: {
+      facingMode: 'environment',
+      width: { ideal: 1280 },
+      height: { ideal: 720 }
+    }
+  }).then(stream => {
+    nativeMediaStream = stream;
+    const video = document.getElementById('bdVideo');
+    video.style.display = 'block';
+    video.srcObject = stream;
+    video.play();
+    video.onloadedmetadata = () => {
+      nativeDetectLoop();
+    };
+  }).catch(err => {
+    console.error(err);
+    showWarn('カメラの起動に失敗しました: ' + err.message + ' （Chromeのカメラ権限設定を確認してください）');
+    scanning = false;
+  });
+}
+
+function nativeDetectLoop() {
+  if (!scanning) return;
+  const video = document.getElementById('bdVideo');
+  const canvas = document.getElementById('overlay-canvas');
+
+  if (video.videoWidth > 0) {
+    nativeDetector.detect(video).then(codes => {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (codes.length > 0) {
+        const box = codes[0].boundingBox;
+        ctx.strokeStyle = '#00e676';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(box.x, box.y, box.width, box.height);
+        handleDetectedCode(codes[0].rawValue);
+      } else {
+        pendingCode = null;
+        pendingCount = 0;
+        setScanProgress(0);
+      }
+    }).catch(() => { /* 一時的な検出失敗は無視 */ });
+  }
+  nativeRafId = requestAnimationFrame(nativeDetectLoop);
+}
+
+function stopNativeScan() {
+  if (nativeRafId) cancelAnimationFrame(nativeRafId);
+  nativeRafId = null;
+  if (nativeMediaStream) {
+    nativeMediaStream.getTracks().forEach(t => t.stop());
+    nativeMediaStream = null;
+  }
+  const video = document.getElementById('bdVideo');
+  video.pause();
+  video.srcObject = null;
+  video.style.display = 'none';
+  const canvas = document.getElementById('overlay-canvas');
+  canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+}
+
+function startQuaggaScan() {
   Quagga.init({
     inputStream: {
       name: 'Live',
@@ -287,13 +357,13 @@ function startScan() {
       target: document.querySelector('#scanner-container'),
       constraints: {
         facingMode: 'environment',
-        width: { min: 640 },
-        height: { min: 480 }
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
       },
       area: { top: '0%', right: '0%', left: '0%', bottom: '0%' }
     },
-    locator: { patchSize: 'medium', halfSample: true },
-    numOfWorkers: navigator.hardwareConcurrency || 2,
+    locator: { patchSize: 'large', halfSample: false },
+    numOfWorkers: navigator.hardwareConcurrency || 4,
     frequency: 10,
     decoder: {
       // 商品バーコードはJAN/EAN・UPCが主なので対象を絞り、誤読の原因になる
@@ -310,22 +380,20 @@ function startScan() {
     if (err) {
       console.error(err);
       showWarn('カメラの起動に失敗しました: ' + err.message + ' （Chromeのカメラ権限設定を確認してください）');
+      scanning = false;
       return;
     }
     Quagga.start();
-    scanning = true;
   });
 
   Quagga.onProcessed(drawOverlay);
   Quagga.onDetected(handleDetected);
 }
 
-function stopScan() {
-  if (!scanning) return;
+function stopQuaggaScan() {
   Quagga.offDetected(handleDetected);
   Quagga.offProcessed(drawOverlay);
   Quagga.stop();
-  scanning = false;
 }
 
 function drawOverlay(result) {
@@ -373,8 +441,12 @@ function drawOverlay(result) {
 }
 
 function handleDetected(result) {
-  const code = result.codeResult.code;
+  handleDetectedCode(result.codeResult.code);
+}
 
+// BarcodeDetector / Quagga2 共通の確定処理。
+// 連続一致 + チェックディジット検証でノイズを除去してからリストに反映する。
+function handleDetectedCode(code) {
   // チェックディジットが不正な読み取りはノイズとして即座に捨てる
   if (!isValidChecksum(code)) {
     pendingCode = null;
@@ -418,8 +490,6 @@ function handleDetected(result) {
   if (navigator.vibrate) navigator.vibrate(100);
 
   if (isDuplicate) {
-    const existing = items.find(it => it.barcode === code);
-    showQuickLinks(code, existing.name);
     return; // 重複防止（リストへの追加はしない）
   }
 
@@ -427,7 +497,6 @@ function handleDetected(result) {
   const fee = Number(document.getElementById('defFee').value) || 0;
   items.push({ barcode: code, time: timeStr, name: '', cost: cost, fee: fee, price: 0 });
   renderTable();
-  showQuickLinks(code, '');
 }
 
 function calcProfit(item) {
@@ -441,9 +510,9 @@ function escapeHtml(str) {
 }
 
 function renderTable() {
-  const body = document.getElementById('itemBody');
+  const list = document.getElementById('itemList');
   const emptyMsg = document.getElementById('emptyMsg');
-  body.innerHTML = '';
+  list.innerHTML = '';
   document.getElementById('countBadge').textContent = items.length;
 
   if (items.length === 0) {
@@ -454,39 +523,47 @@ function renderTable() {
 
   const targetRate = Number(document.getElementById('targetRate').value) || 0;
 
-  items.forEach((item, idx) => {
+  // 新しくスキャンしたものを上に表示
+  items.slice().reverse().forEach((item) => {
+    const idx = items.indexOf(item);
     const { profit, rate } = calcProfit(item);
-    const tr = document.createElement('tr');
-    if (item.price > 0 && rate >= targetRate) tr.classList.add('good');
+    const card = document.createElement('div');
+    card.className = 'item-card' + ((item.price > 0 && rate >= targetRate) ? ' good' : '');
 
     const q = encodeURIComponent(item.name || item.barcode);
-    const links = `
-      <span class="links">
+    const profitClass = profit > 0 ? 'profit-pos' : (profit < 0 ? 'profit-neg' : '');
+
+    card.innerHTML = `
+      <div class="item-card-head">
+        <span class="barcode">${item.barcode}</span>
+        <span class="time">${item.time}</span>
+      </div>
+      <input class="cell-name" data-field="name" value="${escapeHtml(item.name)}" placeholder="商品名を入力（任意）">
+      <div class="numbers-row">
+        <div><label>仕入れ値</label><input class="cell" type="number" data-field="cost" value="${item.cost}"></div>
+        <div><label>送料手数料</label><input class="cell" type="number" data-field="fee" value="${item.fee}"></div>
+        <div><label>売値</label><input class="cell" type="number" data-field="price" value="${item.price}"></div>
+      </div>
+      <div class="profit-row">
+        <span>利益額: <span class="${profitClass}">${profit.toFixed(0)}円</span></span>
+        <span>利益率: <span class="${profitClass}">${item.price > 0 ? rate.toFixed(1) + '%' : '-'}</span></span>
+      </div>
+      <div class="links">
         <a class="l-amazon" target="_blank" rel="noopener" href="https://www.amazon.co.jp/s?k=${q}">Amazon</a>
         <a class="l-rakuten" target="_blank" rel="noopener" href="https://search.rakuten.co.jp/search/mall/${q}/">楽天</a>
         <a class="l-mercari" target="_blank" rel="noopener" href="https://jp.mercari.com/search?keyword=${q}">メルカリ</a>
         <a class="l-yahoo" target="_blank" rel="noopener" href="https://shopping.yahoo.co.jp/search?p=${q}">Yahoo</a>
-      </span>`;
-
-    tr.innerHTML = `
-      <td>${item.barcode}</td>
-      <td class="time-cell">${item.time}</td>
-      <td><input class="cell cell-name" data-field="name" value="${escapeHtml(item.name)}" placeholder="商品名"></td>
-      <td><input class="cell" type="number" data-field="cost" value="${item.cost}"></td>
-      <td><input class="cell" type="number" data-field="fee" value="${item.fee}"></td>
-      <td><input class="cell" type="number" data-field="price" value="${item.price}"></td>
-      <td class="${profit > 0 ? 'profit-pos' : (profit < 0 ? 'profit-neg' : '')}">${profit.toFixed(0)}</td>
-      <td class="${profit > 0 ? 'profit-pos' : (profit < 0 ? 'profit-neg' : '')}">${item.price > 0 ? rate.toFixed(1) + '%' : '-'}</td>
-      <td class="links-cell">${links}</td>
-      <td><button class="del-btn" data-idx="${idx}">削除</button></td>
+      </div>
+      <button class="del-btn" data-idx="${idx}">削除</button>
     `;
-    body.appendChild(tr);
+    list.appendChild(card);
   });
 
-  body.querySelectorAll('input.cell').forEach(input => {
+  list.querySelectorAll('input.cell, input.cell-name').forEach(input => {
     input.addEventListener('input', (e) => {
-      const tr = e.target.closest('tr');
-      const idx = Array.from(body.children).indexOf(tr);
+      const card = e.target.closest('.item-card');
+      const delBtn = card.querySelector('.del-btn');
+      const idx = Number(delBtn.dataset.idx);
       const field = e.target.dataset.field;
       const val = field === 'name' ? e.target.value : Number(e.target.value) || 0;
       items[idx][field] = val;
@@ -495,7 +572,7 @@ function renderTable() {
     });
   });
 
-  body.querySelectorAll('.del-btn').forEach(btn => {
+  list.querySelectorAll('.del-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       const idx = Number(e.target.dataset.idx);
       items.splice(idx, 1);
@@ -506,10 +583,8 @@ function renderTable() {
 
 function restoreFocus(idx, field) {
   requestAnimationFrame(() => {
-    const body = document.getElementById('itemBody');
-    const tr = body.children[idx];
-    if (!tr) return;
-    const input = tr.querySelector(`input[data-field="${field}"]`);
+    const list = document.getElementById('itemList');
+    const input = list.querySelector(`.del-btn[data-idx="${idx}"]`).closest('.item-card').querySelector(`input[data-field="${field}"]`);
     if (input) {
       input.focus();
       const len = input.value.length;
